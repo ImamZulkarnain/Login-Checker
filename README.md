@@ -1,146 +1,186 @@
-<<<<<<< HEAD
-# Username search benchmarks
+# Login Checker — COSC 520 Assignment 1
 
-Install dependencies from the project folder:
+Compare five manually implemented username-membership methods: linear search, binary search with merge sort, a hash table with linear probing, a Bloom filter, and a Cuckoo filter. The benchmark measures construction time and lookup time for present and absent usernames separately.
+
+- Repository: https://github.com/ImamZulkarnain/Login-Checker
+- Downloadable datasets: https://drive.google.com/drive/folders/1WTZ6HO4-pudKRQyk-faQq7lXppp96cCN?usp=sharing
+
+## 1. Get the project and install dependencies
+
+Install Python 3 and Git first. Use a virtual environment to keep dependencies separate from other projects. Python 3.12 or newer is a suitable starting point; the original benchmark's exact Python version and package versions are not recorded in the saved CSVs.
+
+Clone the repository, then work from the folder containing `main.py`:
 
 ```bash
+git clone https://github.com/ImamZulkarnain/Login-Checker.git
+cd Login-Checker
+```
+
+Alternatively, download the repository ZIP from GitHub, extract it, and open a terminal in the extracted folder.
+
+### Windows PowerShell
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-Run the default experiment (10,000 and 100,000 usernames from data/usernames_100M.txt;
-100 present and 100 absent queries per size; three trials):
+If `py` is unavailable but `python --version` works, use `python -m venv .venv`. If PowerShell blocks activation, activation is optional: replace `python` in every subsequent command with `.\.venv\Scripts\python.exe`, including the dependency installation command.
+
+### macOS or Linux
 
 ```bash
-python main.py
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-Run a shorter experiment:
+The dependencies are `tqdm` for progress, `mmh3` for hash primitives inside the filters, and `matplotlib` for plots. Membership structures and search algorithms are implemented in `methods/`.
 
-```bash
-python main.py --sizes 1000 10000 --queries 50 --trials 2
-```
+Keep this terminal in the project root for all commands below.
 
-Select a dataset and output file:
+## 2. Run the unit tests
 
-```bash
-python main.py --dataset data/usernames_1M.txt --sizes 10000 100000 --queries 100 --trials 3 --output results/my_run.csv
-```
-
-Output files must be new. By default, a timestamped CSV is saved in results/.
-Only the largest requested prefix of the dataset is loaded. Smaller sizes use
-prefixes of that same data. Duplicate usernames and insufficient data are errors.
-The loader and query preparation use temporary sets for validation, not for
-implementing or timing any of the five search methods.
-
-## Measurements
-
-Each row represents one method, dataset size, and trial. All five methods get
-the same present and absent queries within a trial. Seeds are repeatable, and
-method order is shuffled reproducibly. Three queries from each category warm
-up lookup before timing. Present lookups are timed before absent lookups.
-
-Build time includes copying for linear search, manual merge sort for binary
-search, and allocation/insertion for the three structures. Hash-table resizing
-is included. Cuckoo failure tracking is also included. File loading, query
-preparation, correctness counting, printing, and CSV writing are excluded.
-Lookup times include the loop, function calls, and collection of the answers.
-Only one built structure is retained at a time, but the input list remains in
-memory. Garbage collection runs before each method, outside its timer.
-
-Present queries are sampled without replacement. Absent queries are generated
-using the same length/character rules as the dataset generator, then checked
-against the selected dataset. They are absent from that experiment's dataset,
-not necessarily from every larger file. The default 100 absent queries are
-suitable for a quick runtime experiment, not a precise false-positive estimate.
-Increase --queries for more precise estimates, at the cost of slower linear search.
-
-The simplified CSV saves nine columns: method, dataset_size, trial,
-build_seconds, present_seconds_per_query, absent_seconds_per_query,
-false_positives, false_negatives, and failed_insertions. Record the command,
-seed, query count, filter target rate, and machine details with your experiment
-notes because these settings are not saved in this CSV.
-
-false_negatives counts missed queries for successfully inserted keys. Rejected
-Cuckoo keys are excluded from that count. Always inspect failed_insertions:
-a partially built Cuckoo filter is not a successful full-dataset build.
-
-The benchmark does not measure memory. HashTable uses a Python hash
-implementation; the filters use mmh3, which affects practical timing comparisons.
-Use python -m scripts.plot to generate charts from the saved measurements.
-
-The runner rejects Bloom configurations above 2**32 bits and Cuckoo fingerprint
-widths above 32 bits. These limits reflect the current implementations.
-
-## Tests
+No dataset download is needed for the tests:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-The methods/ folder contains algorithms; tests/ contains correctness tests.
-The generator can create another dataset with a chosen count, seed, and path:
+A successful run ends with `OK`. The reviewed test suite contains 71 tests covering all five methods, sorting, collisions, resizing, filter behavior, Cuckoo rollback, and benchmark accounting.
+
+## 3. Quick end-to-end run (no large download)
+
+Generate 10,000 usernames, run all five methods at two sizes with two trials, and create the plots:
 
 ```bash
-python -m scripts.generate_usernames --count 1000000 --seed 42 --output data/new_usernames.txt
+python -m scripts.generate_usernames --count 10000 --seed 42 --output data/peer_demo.txt
+python main.py --dataset data/peer_demo.txt --sizes 1000 10000 --queries 50 --trials 2 --seed 42 --false-positive-rate 0.01 --output results/peer_demo.csv
+python -m scripts.plot --input results/peer_demo.csv
+python -m scripts.plot --input results/peer_demo.csv --exclude-linear
 ```
 
-Generation holds the usernames in memory and replaces an existing output file.
+Expected outputs:
 
-## Plot results
+- `data/peer_demo.txt`: 10,000 unique usernames, one per line.
+- `results/peer_demo.csv`: 20 measurement rows plus a header (5 methods × 2 sizes × 2 trials).
+- `results/plots/peer_demo/`: `build_time.png`, `present_lookup_time.png`, and `absent_lookup_time.png`.
+- `results/plots/peer_demo_without_linear/`: the same three filenames, showing only the four faster methods.
 
-Install the updated dependencies, then plot the most recently modified
-benchmark_*.csv file in results/:
+Plots are saved as PNG files; no graphical window is required.
+
+**Rerunning:** the generator replaces an existing dataset at its output path. The benchmark refuses to overwrite a CSV: choose a new `--output` filename and use that filename when plotting. Plotting again replaces the PNGs for that CSV. Always give the generator an explicit output path so it does not overwrite `data/usernames.txt`.
+
+## 4. Run the report's benchmark workload
+
+The report uses these settings:
+
+| Setting | Value |
+| --- | --- |
+| Dataset sizes | 10,000; 100,000; 1,000,000; 10,000,000 |
+| Present queries per size and trial | 1,000 |
+| Absent queries per size and trial | 1,000 |
+| Trials | 2 |
+| Base query seed | 42 (trial seeds 42 and 43) |
+| Target filter false-positive probability | 0.01 |
+| Cuckoo slots per bucket / relocation limit | 4 / 500 |
+
+Download the original dataset from the link above and place the extracted text file in `data/`. If using `usernames_100M.txt`, run:
 
 ```bash
-python -m pip install -r requirements.txt
-python -m scripts.plot
+python main.py --dataset data/usernames_100M.txt --sizes 10000 100000 1000000 10000000 --queries 1000 --trials 2 --seed 42 --false-positive-rate 0.01 --output results/peer_report.csv
+python -m scripts.plot --input results/peer_report.csv
+python -m scripts.plot --input results/peer_report.csv --exclude-linear
 ```
 
-Select a specific experiment:
+If the downloaded file has another name, change `--dataset` accordingly. It must contain at least ten million unique, nonempty usernames. The program reads only the largest requested prefix and uses smaller prefixes for smaller sizes. Do not reorder or edit the original data when reproducing an experiment.
+
+The full workload produces 40 measurement rows. Allow substantially more time and RAM than for the quick run: Python objects, validation sets, sorting, and filter buckets occupy more memory than the text file itself. If memory is insufficient, remove `10000000` from `--sizes` and document the smaller maximum; that is a partial replication of the report workload.
+
+For a new synthetic experiment without downloading the original data, generate a separate dataset:
 
 ```bash
-python -m scripts.plot --input results/my_run.csv
+python -m scripts.generate_usernames --count 10000000 --seed 42 --output data/peer_generated_10M.txt
 ```
 
-Three 300-DPI PNG files are saved under results/plots/<CSV filename>/:
-construction time in seconds, and present/absent lookup time in microseconds
-per query. Each point is the arithmetic mean across trials; error bars show
-minimum and maximum, not confidence intervals. Axes are logarithmic unless a
-zero timing requires a linear time axis. Repeating the command replaces the
-three plots for that CSV. --output-dir selects a different output folder.
+Then use that path with the full benchmark command. Generation retains the usernames and a uniqueness set in memory. This recreates the workload design, but an independently generated file is not established as identical to the report's dataset: the historical dataset filename/hash and generation seed are not stored in the results CSV.
 
-The plotter rejects incomplete size/trial groups, duplicate rows, failed
-insertions, false negatives, and false positives from exact methods. Filter
-false positives are permitted. No false-positive rate chart is produced because
-the simplified CSV does not record the query count needed to calculate rates.
+## 5. Recreate plots from the supplied results
 
-
-## Project structure
-
-- main.py: command-line settings, progress bars, experiment loops, and CSV output.
-- benchmarking/data.py: load usernames and prepare present/absent queries.
-- benchmarking/runners.py: construction timing, search timing, and correctness counts.
-- methods/: the five algorithm implementations.
-- scripts/generate_usernames.py: dataset generation.
-- scripts/plot.py: plots from benchmark CSV files.
-- tests/: unit tests.
-- data/: datasets.
-- results/: CSV measurements and generated plots.
-
-Run commands from the project root. Use python -m scripts.generate_usernames
-and python -m scripts.plot so Python resolves package imports correctly.
-Default dataset and result locations are relative to the project folder;
-explicit relative paths passed on the command line use the working directory.
-
-Plot all methods except linear search:
+`results/combined.csv` contains the report's five-method measurements. Some copies contain trailing rows consisting only of commas, which the strict plotter rejects. Preserve the original and create a copy that drops only completely empty records:
 
 ```bash
-python -m scripts.plot --input results/combined.csv --exclude-linear
+python -c "import csv; from pathlib import Path; source=Path('results/combined.csv'); rows=list(csv.reader(source.open(newline='', encoding='utf-8-sig'))); target=Path('results/combined_clean.csv'); f=target.open('x', newline='', encoding='utf-8'); csv.writer(f).writerows(row for row in rows if any(cell.strip() for cell in row)); f.close()"
+python -m scripts.plot --input results/combined_clean.csv
+python -m scripts.plot --input results/combined_clean.csv --exclude-linear
 ```
 
-This accepts a full CSV or one with linear-search rows removed. The other four
-methods must be present for each size/trial. Default output goes into
-results/plots/combined_without_linear/ to preserve the five-method plots.
-=======
-# Login-Checker
->>>>>>> 97aa2070f1fa649ee26f6df6290a4c3b3dbc29ad
+The cleaning command intentionally refuses to overwrite an existing `combined_clean.csv`. If it already exists from a previous run, use that file directly. The separately supplied four-method file can be plotted with:
+
+```bash
+python -m scripts.plot --input "results/combined - linear.csv" --exclude-linear
+```
+
+Use `--input` explicitly: automatic selection searches only for `benchmark_*.csv`, not `combined.csv`. `--exclude-linear` changes the plots only; it does not skip linear search during benchmarking.
+
+## 6. Interpret and reproduce the measurements
+
+Each CSV row represents one method, dataset size, and trial. The nine columns are:
+
+```text
+method,dataset_size,trial,build_seconds,present_seconds_per_query,absent_seconds_per_query,false_positives,false_negatives,failed_insertions
+```
+
+- All timing columns are in seconds. Lookup columns are averages per query; plots convert lookup times to microseconds.
+- Construction includes list copying, merge sorting, table allocation/resizing, or filter insertion as appropriate.
+- File loading, query generation, correctness counting, and CSV writing are excluded from timing. Lookup timing includes Python calls, loops, and answer collection.
+- Every method receives the same queries within a trial. Method order is shuffled reproducibly; three queries of each category warm up lookup first.
+- Plot points are arithmetic means across trials. Error bars show minimum and maximum, not confidence intervals.
+- Exact methods should have zero false positives, false negatives, and failed insertions. Filters can return false positives. For the report workload, divide a row's false-positive count by 1,000 to obtain its observed rate.
+- Rejected Cuckoo insertions are recorded separately and excluded from false-negative counts. A nonzero `failed_insertions` count means the filter did not store the complete dataset. The plotter rejects such results.
+- Bloom/Cuckoo positives require exact confirmation in a real login system; that confirmation cost is not benchmarked here.
+- Memory consumption is not measured. The hash table uses Python FNV-1a while the filters use compiled `mmh3`, so timing differences include implementation costs.
+
+Identical timings are not expected across machines or repeated runs. Use the same dataset, code revision, settings, Python version, and dependency versions to make comparisons meaningful. The requirements file specifies version ranges rather than a historical lockfile.
+
+For each new experiment, save the command and dataset filename, CPU/RAM details, and these environment records alongside the CSV:
+
+```bash
+python -c "import platform,sys; print(sys.version); print(platform.platform()); print(platform.processor())" > results/peer_environment.txt
+python -m pip freeze > results/peer_packages.txt
+git rev-parse HEAD > results/peer_commit.txt
+```
+
+The last command requires a Git clone; ZIP users should record the downloaded revision separately. A later run can install the captured package versions with `python -m pip install -r results/peer_packages.txt`. The CSV itself does not retain the query count, seeds, dataset identity, package versions, or machine details.
+
+## 7. Troubleshooting
+
+| Problem | What to do |
+| --- | --- |
+| `python` is not found | Create/activate the virtual environment using the platform-specific steps above, or call its interpreter directly. |
+| `ModuleNotFoundError` | Run `python -m pip install -r requirements.txt` with the same interpreter used for the tests/benchmark. |
+| Dataset file not found | Download or generate a dataset and pass its actual path with `--dataset`. Plain `python main.py` expects `data/usernames_100M.txt`. |
+| Too few usernames / duplicate usernames | Select a sufficiently large original dataset or regenerate a new unique one. The loader checks the selected prefix. |
+| Output file already exists | Choose a fresh CSV path. Completed measurements are deliberately protected from overwriting. |
+| `No benchmark CSV found` | Supply `--input results/your_file.csv` explicitly. |
+| `Unknown method` at the end of `combined.csv` | Use the clean-copy procedure above to remove empty records. Do not discard actual measurements. |
+| Incomplete results / rejected insertions / false negatives | Inspect the CSV and terminal error. Rerun or investigate the cause; do not remove failing measurement rows to force a plot. |
+| High memory usage or a long run | Start with the quick run, then increase sizes gradually. Linear search and large dataset generation can be expensive. |
+| `No module named scripts` or `methods` | Run from the folder containing `main.py`, using `python -m scripts.plot` or `python -m scripts.generate_usernames`. |
+
+The runner rejects Bloom arrays above `2**32` bits and Cuckoo fingerprints above 32 bits. At a 1% target, the current Bloom implementation cannot support a one-billion-entry run; the reported experiments use ten million or fewer.
+
+## Project layout
+
+```text
+main.py                     Benchmark command-line interface and CSV output
+requirements.txt            Dependency version ranges
+methods/                    Five membership/search implementations
+benchmarking/               Dataset loading, query generation, and timing
+scripts/generate_usernames.py  Reproducible synthetic dataset generator
+scripts/plot.py              CSV validation and plot generation
+tests/                      Unit tests and test instructions
+data/                       Downloaded or locally generated datasets
+results/                    Saved measurements and plots
+```
