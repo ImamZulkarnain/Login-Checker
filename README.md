@@ -139,37 +139,10 @@ method,dataset_size,trial,build_seconds,present_seconds_per_query,absent_seconds
 - Plot points are arithmetic means across trials. Error bars show minimum and maximum, not confidence intervals.
 - Exact methods should have zero false positives, false negatives, and failed insertions. Filters can return false positives. For the report workload, divide a row's false-positive count by 1,000 to obtain its observed rate.
 - Rejected Cuckoo insertions are recorded separately and excluded from false-negative counts. A nonzero `failed_insertions` count means the filter did not store the complete dataset. The plotter rejects such results.
-- Bloom/Cuckoo positives require exact confirmation in a real login system; that confirmation cost is not benchmarked here.
-- Memory consumption is not measured. The hash table uses Python FNV-1a while the filters use compiled `mmh3`, so timing differences include implementation costs.
 
 Identical timings are not expected across machines or repeated runs. Use the same dataset, code revision, settings, Python version, and dependency versions to make comparisons meaningful. The requirements file specifies version ranges rather than a historical lockfile.
 
-For each new experiment, save the command and dataset filename, CPU/RAM details, and these environment records alongside the CSV:
 
-```bash
-python -c "import platform,sys; print(sys.version); print(platform.platform()); print(platform.processor())" > results/peer_environment.txt
-python -m pip freeze > results/peer_packages.txt
-git rev-parse HEAD > results/peer_commit.txt
-```
-
-The last command requires a Git clone; ZIP users should record the downloaded revision separately. A later run can install the captured package versions with `python -m pip install -r results/peer_packages.txt`. The CSV itself does not retain the query count, seeds, dataset identity, package versions, or machine details.
-
-## 7. Troubleshooting
-
-| Problem | What to do |
-| --- | --- |
-| `python` is not found | Create/activate the virtual environment using the platform-specific steps above, or call its interpreter directly. |
-| `ModuleNotFoundError` | Run `python -m pip install -r requirements.txt` with the same interpreter used for the tests/benchmark. |
-| Dataset file not found | Download or generate a dataset and pass its actual path with `--dataset`. Plain `python main.py` expects `data/usernames_100M.txt`. |
-| Too few usernames / duplicate usernames | Select a sufficiently large original dataset or regenerate a new unique one. The loader checks the selected prefix. |
-| Output file already exists | Choose a fresh CSV path. Completed measurements are deliberately protected from overwriting. |
-| `No benchmark CSV found` | Supply `--input results/your_file.csv` explicitly. |
-| `Unknown method` at the end of `combined.csv` | Use the clean-copy procedure above to remove empty records. Do not discard actual measurements. |
-| Incomplete results / rejected insertions / false negatives | Inspect the CSV and terminal error. Rerun or investigate the cause; do not remove failing measurement rows to force a plot. |
-| High memory usage or a long run | Start with the quick run, then increase sizes gradually. Linear search and large dataset generation can be expensive. |
-| `No module named scripts` or `methods` | Run from the folder containing `main.py`, using `python -m scripts.plot` or `python -m scripts.generate_usernames`. |
-
-The runner rejects Bloom arrays above `2**32` bits and Cuckoo fingerprints above 32 bits. At a 1% target, the current Bloom implementation cannot support a one-billion-entry run; the reported experiments use ten million or fewer.
 
 ## Project layout
 
