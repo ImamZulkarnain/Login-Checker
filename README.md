@@ -97,6 +97,15 @@ python -m scripts.generate_usernames --count 10000000 --seed 42 --output data/ne
 Then use that path with the full benchmark command.
 
 
+### If in any case your system generates csv files with trailing rows of only commas, preserve the original and create a copy that drops only completely empty records:
+
+```bash
+python -c "import csv; from pathlib import Path; source=Path('results/peer_report.csv'); rows=list(csv.reader(source.open(newline='', encoding='utf-8-sig'))); target=Path('results/peer_report_clean.csv'); f=target.open('x', newline='', encoding='utf-8'); csv.writer(f).writerows(row for row in rows if any(cell.strip() for cell in row)); f.close()"
+```
+
+Then use that cleaned file to plot as before.
+
+
 ## Project layout
 
 ```text
